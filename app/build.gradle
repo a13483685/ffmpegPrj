@@ -14,6 +14,7 @@ android {
                 cppFlags "-std=c++11"
             }
         }
+        //jniLibs.srcDirs=['libs'] 会将libs目录下的库会拷贝到项目当中，打包的时候会打包到apk中
         sourceSets {
             main {
                 jniLibs.srcDirs = ['libs']
