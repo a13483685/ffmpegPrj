@@ -20,6 +20,9 @@ android {
                 jniLibs.srcDirs = ['libs']
             }
         }
+        ndk{
+            abiFilters "armeabi-v7a"//只编译armeabi的库
+        }
     }
     buildTypes {
         release {
@@ -29,7 +32,7 @@ android {
     }
     externalNativeBuild {
         cmake {
-            path "CMakeLists.txt"
+            path "CMakeLists.txt"//cmake配置文件位置
         }
     }
 }
