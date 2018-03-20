@@ -90,6 +90,20 @@ Java_demo_test_com_myapplication_MainActivity_stringFromJNI(
     audioStream = av_find_best_stream(ic,AVMEDIA_TYPE_AUDIO,-1,-1,NULL,0);
     LOGW("av_find_best_stream audioStream = %d",audioStream);
 
+    AVPacket *pkt = av_packet_alloc();
+    for (;;)
+    {
+        int re = av_read_frame(ic,pkt);
+        if(re!=0)
+        {
+            LOGW("读取到结尾处");
+            av_seek_frame(ic,videoStream,2,AVSEEK_FLAG_BACKWARD|AVSEEK_FLAG_FRAME);
+            continue;
+        }
+
+    }
+
+
     avformat_close_input(&ic);
     return env->NewStringUTF(hello.c_str());
 
