@@ -87,6 +87,8 @@ Java_demo_test_com_myapplication_MainActivity_stringFromJNI(
         }
     }
 
+    audioStream = av_find_best_stream(ic,AVMEDIA_TYPE_AUDIO,-1,-1,NULL,0);
+    LOGW("av_find_best_stream audioStream = %d",audioStream);
 
     avformat_close_input(&ic);
     return env->NewStringUTF(hello.c_str());
