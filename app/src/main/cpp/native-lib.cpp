@@ -103,20 +103,34 @@ Java_demo_test_com_myapplication_MainActivity_stringFromJNI(
         LOGW("avcodec_find failed!");
         return env->NewStringUTF(hello.c_str());
     }
-    AVCodecContext *cc = avcodec_alloc_context3(codec);
-    //
-    avcodec_parameters_to_context(cc,ic->streams[videoStream]->codecpar);
-    cc->thread_count = 1;
+    AVCodecContext *vc = avcodec_alloc_context3(codec);
+    //开启视频解码器
+    avcodec_parameters_to_context(vc,ic->streams[videoStream]->codecpar);
+    vc->thread_count = 1;
     //开启解码器
-    ret = avcodec_open2(cc,0,0);
+    ret = avcodec_open2(vc,0,0);
     if(ret!=0)
     {
-        LOGW("AVCODEC_OPEN2 FAILED!");
+        LOGW("AVCODEC_OPEN2 VIDEO FAILED!");
+        return env->NewStringUTF(hello.c_str());
+    }
+
+    AVCodec *avCodec = avcodec_find_decoder(ic->streams[videoStream]->codecpar->codec_id);
+    //开启音频解码器
+    AVCodecContext *ac = avcodec_alloc_context3(avCodec);
+    avcodec_parameters_to_context(ac,ic->streams[videoStream]->codecpar);
+    ac->thread_count = 1;
+    //开启解码器
+    ret = avcodec_open2(ac,0,0);
+    if(ret!=0)
+    {
+        LOGW("AVCODEC_OPEN2 AUDIO FAILED!");
         return env->NewStringUTF(hello.c_str());
     }
 
 
     AVPacket *pkt = av_packet_alloc();
+    AVFrame *frame = av_frame_alloc();
     for (;;)
     {
         int re = av_read_frame(ic,pkt);
@@ -127,9 +141,33 @@ Java_demo_test_com_myapplication_MainActivity_stringFromJNI(
             av_seek_frame(ic,videoStream,pos,AVSEEK_FLAG_BACKWARD|AVSEEK_FLAG_FRAME);
             continue;
         }
-        LOGW("stream = %d size = %d pts =%lld flag=%d",pkt->stream_index,pkt->size,pkt->pts,pkt->flags);
-        av_packet_unref(pkt);
-    }
+        //只测试视频
+        if(pkt->stream_index !=videoStream)
+        {
+            continue;
+        }
+        AVCodecContext *cc = vc;
+        if(pkt->stream_index == audioStream)
+            cc = ac;
+
+        //发送到线程中解码 会拷贝到内存中一份
+        re = avcodec_send_packet(cc,pkt);
+        av_packet_unref(pkt);//内存中以及存在一份了
+        if(re !=0)
+        {
+            LOGW("avcodec_send_packet failed");
+            continue;
+        }
+
+        re = avcodec_receive_frame(cc,frame);
+        if(re !=0)
+        {
+            LOGW("avcodec_receive_frame failed");
+            continue;
+        }
+//        LOGW("stream = %d size = %d pts =%lld flag=%d",pkt->stream_index,pkt->size,pkt->pts,pkt->flags);
+        LOGW("avcodec_receive_frame %lld",frame->pts);
+     }
 
 
     avformat_close_input(&ic);
