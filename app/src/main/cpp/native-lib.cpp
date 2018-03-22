@@ -26,11 +26,14 @@ Java_demo_test_com_myapplication_MainActivity_stringFromJNI(
         jobject /* this */) {
     std::string hello = "Hello from C++";
     hello +=avcodec_configuration();
-    //1.初始化解封装
+    //1.初始化解封装,注册解码器
     av_register_all();
     //2.初始化网络
     avformat_network_init();
     //3.打开文件
+
+    //解码器初始化
+    avcodec_register_all();
     AVFormatContext *ic = NULL;
     char path[] = "/sdcard/1080.mp4";
     int ret = avformat_open_input(&ic,path,0,0);
@@ -86,9 +89,32 @@ Java_demo_test_com_myapplication_MainActivity_stringFromJNI(
             );
         }
     }
-
+    //获取音频流信息
     audioStream = av_find_best_stream(ic,AVMEDIA_TYPE_AUDIO,-1,-1,NULL,0);
     LOGW("av_find_best_stream audioStream = %d",audioStream);
+
+    //解码器也要初始化
+
+    //软解码器
+    AVCodec *codec = avcodec_find_decoder(ic->streams[videoStream]->codecpar->codec_id);
+//    codec = avcodec_find_decoder_by_name("h264_mediacodec");
+    if (!codec)
+    {
+        LOGW("avcodec_find failed!");
+        return env->NewStringUTF(hello.c_str());
+    }
+    AVCodecContext *cc = avcodec_alloc_context3(codec);
+    //
+    avcodec_parameters_to_context(cc,ic->streams[videoStream]->codecpar);
+    cc->thread_count = 1;
+    //开启解码器
+    ret = avcodec_open2(cc,0,0);
+    if(ret!=0)
+    {
+        LOGW("AVCODEC_OPEN2 FAILED!");
+        return env->NewStringUTF(hello.c_str());
+    }
+
 
     AVPacket *pkt = av_packet_alloc();
     for (;;)
@@ -97,10 +123,12 @@ Java_demo_test_com_myapplication_MainActivity_stringFromJNI(
         if(re!=0)
         {
             LOGW("读取到结尾处");
-            av_seek_frame(ic,videoStream,2,AVSEEK_FLAG_BACKWARD|AVSEEK_FLAG_FRAME);
+            int pos = 20*r2d(ic->streams[videoStream]->time_base);
+            av_seek_frame(ic,videoStream,pos,AVSEEK_FLAG_BACKWARD|AVSEEK_FLAG_FRAME);
             continue;
         }
-
+        LOGW("stream = %d size = %d pts =%lld flag=%d",pkt->stream_index,pkt->size,pkt->pts,pkt->flags);
+        av_packet_unref(pkt);
     }
 
 
