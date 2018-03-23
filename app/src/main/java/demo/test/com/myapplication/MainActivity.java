@@ -27,5 +27,5 @@ public class MainActivity extends AppCompatActivity {
      * which is packaged with this application.
      */
     public native String stringFromJNI();
-    public native boolean open(String url,Object handle);
+//    public native boolean open(String url,Object handle);
 }
