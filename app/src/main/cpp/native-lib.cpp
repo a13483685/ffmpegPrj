@@ -16,11 +16,19 @@ static double r2d(AVRational r)
     return r.den==0||r.num==0?0:(double)r.num/(double)r.den;
 }
 
+//当前时间戳
+long long getNowMs()
+{
+    struct timeval tv;
+    gettimeofday(&tv,NULL);
+    int sec = tv.tv_sec%360000;
+    long long t = sec*1000+tv.tv_usec/1000;
+    return t;
+}
+
 
 extern "C"
-JNIEXPORT jstring
-
-JNICALL
+JNIEXPORT jstring JNICALL
 Java_demo_test_com_myapplication_MainActivity_stringFromJNI(
         JNIEnv *env,
         jobject /* this */) {
@@ -106,7 +114,7 @@ Java_demo_test_com_myapplication_MainActivity_stringFromJNI(
     AVCodecContext *vc = avcodec_alloc_context3(codec);
     //开启视频解码器
     avcodec_parameters_to_context(vc,ic->streams[videoStream]->codecpar);
-    vc->thread_count = 1;
+    vc->thread_count = 8;
     //开启解码器
     ret = avcodec_open2(vc,0,0);
     if(ret!=0)
@@ -119,7 +127,7 @@ Java_demo_test_com_myapplication_MainActivity_stringFromJNI(
     //开启音频解码器
     AVCodecContext *ac = avcodec_alloc_context3(avCodec);
     avcodec_parameters_to_context(ac,ic->streams[videoStream]->codecpar);
-    ac->thread_count = 1;
+    ac->thread_count = 8;
     //开启解码器
     ret = avcodec_open2(ac,0,0);
     if(ret!=0)
@@ -131,8 +139,19 @@ Java_demo_test_com_myapplication_MainActivity_stringFromJNI(
 
     AVPacket *pkt = av_packet_alloc();
     AVFrame *frame = av_frame_alloc();
+
+    long long start = getNowMs();
+    int frameCount = 0;
+
     for (;;)
     {
+        if(getNowMs()-start >=3000)
+        {
+            LOGW("now decode fps is %d",frameCount/3);
+            start = getNowMs();
+            frameCount = 0;
+        }
+
         int re = av_read_frame(ic,pkt);
         if(re!=0)
         {
@@ -165,8 +184,12 @@ Java_demo_test_com_myapplication_MainActivity_stringFromJNI(
             LOGW("avcodec_receive_frame failed");
             continue;
         }
+
 //        LOGW("stream = %d size = %d pts =%lld flag=%d",pkt->stream_index,pkt->size,pkt->pts,pkt->flags);
         LOGW("avcodec_receive_frame %lld",frame->pts);
+        //每读取成功一帧就加1
+        if(cc == vc)
+            frameCount++;
      }
 
 
