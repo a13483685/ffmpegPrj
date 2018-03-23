@@ -8,6 +8,7 @@
 extern "C" {
 #include <libavcodec/avcodec.h>
 #include <libavformat/avformat.h>
+#include <libswscale/swscale.h>//像素格式转换的头文件
 }
 using namespace std;
 //判断分母是否为零,防止分母为0 将分数转化为带浮点的小数
@@ -140,8 +141,15 @@ Java_demo_test_com_myapplication_MainActivity_stringFromJNI(
     AVPacket *pkt = av_packet_alloc();
     AVFrame *frame = av_frame_alloc();
 
+    SwsContext *vctx = NULL;
+
     long long start = getNowMs();
     int frameCount = 0;
+    int outWidth = 1080;
+    int outHight = 720;
+    //给应用层使用
+    char *rgb = new char[1920*1080*4];
+
 
     for (;;)
     {
@@ -166,8 +174,9 @@ Java_demo_test_com_myapplication_MainActivity_stringFromJNI(
             continue;
         }
         AVCodecContext *cc = vc;
-        if(pkt->stream_index == audioStream)
+        if(pkt->stream_index == audioStream) {
             cc = ac;
+        }
 
         //发送到线程中解码 会拷贝到内存中一份
         re = avcodec_send_packet(cc,pkt);
@@ -188,11 +197,43 @@ Java_demo_test_com_myapplication_MainActivity_stringFromJNI(
 //        LOGW("stream = %d size = %d pts =%lld flag=%d",pkt->stream_index,pkt->size,pkt->pts,pkt->flags);
         LOGW("avcodec_receive_frame %lld",frame->pts);
         //每读取成功一帧就加1
-        if(cc == vc)
+        if(cc == vc) {
             frameCount++;
-     }
+        }
+        //在解码成功之后获得像素的Context，因为在解码之前并不知道图片的宽高
+        //上下文初始化
+        //在宽高比和格式不变的情况下只初始化一次
 
+        vctx = sws_getCachedContext(vctx,
+                                    frame->width,
+                                    frame->height,
+                                    (AVPixelFormat)frame->format,
+                                    outWidth,
+                                    outHight,
+                                    AV_PIX_FMT_RGBA,
+                                    SWS_FAST_BILINEAR,
+                                    0,0,0
+            );
 
+        if(!vctx)
+        {
+            LOGW("sws_getCachedContext failed");
+        } else{
+            uint8_t *data[AV_NUM_DATA_POINTERS] = {0};
+            data[0] = (uint8_t*)rgb;
+            int lines[AV_NUM_DATA_POINTERS] = {0};
+            lines[0] = outWidth*4;
+            //像素格式的转换不成功，只有可能是数据访问不了
+            int h = sws_scale(vctx,
+                              (const uint8_t *const *) frame->data,
+                              frame->linesize,
+                              0,frame->height,data,lines);
+            LOGW("sws_scale =%d",h);
+        }
+
+    }
+
+    delete rgb;
     avformat_close_input(&ic);
     return env->NewStringUTF(hello.c_str());
 
